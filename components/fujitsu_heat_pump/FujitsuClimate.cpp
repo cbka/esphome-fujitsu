@@ -7,15 +7,15 @@ namespace fujitsu {
 
 void FujitsuClimate::setup() {
     ESP_LOGD("fuji", "Fuji initialized");
-    this->lock = xSemaphoreCreateBinary();
-    xSemaphoreGive(this->lock);
-    this->pendingUpdate = false;
-    memcpy(&(this->sharedState), this->heatPump.getCurrentState(), sizeof(FujiFrame));
-    this->heatPump.connect(&Serial2, true);
-	hpisBound = this->heatPump.isBound(); //bound to main controller status. initialize forcing first update
+    memcpy(&(this->sharedState), this->heatPump.getCurrentState(),
+           sizeof(FujiFrame));
+    // c.f. https://github.com/esphome/esphome/blob/acd55b960120265a0a4ce0bd06d08758dce5bbbd/esphome/components/uart/uart_component_esp32_arduino.cpp#L95
+    int8_t tx = this->tx_pin_ != nullptr ? this->tx_pin_->get_pin() : -1;
+    int8_t rx = this->rx_pin_ != nullptr ? this->rx_pin_->get_pin() : -1;
+    this->heatPump.connect(&Serial2, !this->is_master_, rx, tx);
     ESP_LOGD("fuji", "starting task");
-    xTaskCreatePinnedToCore(serialTask, "FujiTask", 10000, (void *)this,
-                            1, &(this->taskHandle), 1);
+    this->heatPump.connect(UART_NUM_2, true);
+}
 
 optional<climate::ClimateMode> FujitsuClimate::fujiToEspMode(
     FujiMode fujiMode) {
