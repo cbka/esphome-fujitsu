@@ -6,8 +6,16 @@ namespace esphome {
 namespace fujitsu {
 
 void FujitsuClimate::setup() {
-    ESP_LOGD(TAG, "Fuji initialized");
-}
+    ESP_LOGD("fuji", "Fuji initialized");
+    this->lock = xSemaphoreCreateBinary();
+    xSemaphoreGive(this->lock);
+    this->pendingUpdate = false;
+    memcpy(&(this->sharedState), this->heatPump.getCurrentState(), sizeof(FujiFrame));
+    this->heatPump.connect(&Serial2, true);
+	hpisBound = this->heatPump.isBound(); //bound to main controller status. initialize forcing first update
+    ESP_LOGD("fuji", "starting task");
+    xTaskCreatePinnedToCore(serialTask, "FujiTask", 10000, (void *)this,
+                            1, &(this->taskHandle), 1);
 
 optional<climate::ClimateMode> FujitsuClimate::fujiToEspMode(
     FujiMode fujiMode) {
